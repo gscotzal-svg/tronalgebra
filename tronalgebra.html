@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>TRON: ARES - GLOBAL ALGEBRA SYSTEM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <style>
+        :root { --neon-red: #ff0022; --neon-glow: rgba(255, 0, 34, 0.6); --bg: #020202; --p2-color: #ff6a00; }
+        body { margin: 0; font-family: 'Orbitron', sans-serif; background: var(--bg); color: white; overflow: hidden; height: 100vh; text-transform: uppercase; }
+        body::before { content: ""; position: absolute; width: 100%; height: 100%; background-image: linear-gradient(rgba(255, 0, 34, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 34, 0.03) 1px, transparent 1px); background-size: 40px 40px; z-index: -1; }
+        
+        .screen { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; justify-content: center; }
+        .active { display: flex; }
+        
+        .menu-card { background: rgba(0,0,0,0.9); padding: 30px; border: 2px solid var(--neon-red); box-shadow: 0 0 25px var(--neon-glow); text-align: center; width: 380px; }
+        input, select, button { background: transparent; border: 1px solid var(--neon-red); color: white; padding: 12px; margin: 8px; width: 90%; font-family: 'Orbitron'; text-align: center; letter-spacing: 1px; }
+        button { background: var(--neon-red); color: black; font-weight: bold; cursor: pointer; transition: 0.3s; border: none; }
+        button:hover { box-shadow: 0 0 20px var(--neon-red); transform: scale(1.02); }
+
+        /* Monitor Docente */
+        .monitor-table { width: 90%; border-collapse: collapse; margin-top: 20px; background: rgba(0,0,0,0.8); }
+        .monitor-table th, .monitor-table td { border: 1px solid var(--neon-red); padding: 12px; text-align: center; font-size: 0.85rem; }
+        .monitor-table th { background: var(--neon-red); color: black; }
+
+        /* Juego */
+        .math-box { background: rgba(0,0,0,0.9); border: 2px solid white; padding: 20px; font-size: 1.8rem; min-width: 150px; text-align: center; box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+        .opt-card { background: rgba(255,255,255,0.02); border: 1px solid var(--neon-red); color: white; padding: 20px; cursor: pointer; transition: 0.2s; font-size: 1.1rem; }
+        .opt-card.correct { background: var(--neon-red) !important; color: black; box-shadow: 0 0 30px var(--neon-red); }
+        .opt-card.wrong { opacity: 0.2; pointer-events: none; }
+        
+        .score-badge { position: absolute; top: 40px; font-size: 1.3rem; letter-spacing: 3px; border-bottom: 2px solid var(--neon-red); padding: 5px 15px; }
+        sup { font-size: 0.6em; vertical-align: super; }
+        #next-btn { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); background: white; color: black; padding: 18px 50px; font-weight: bold; display: none; z-index: 100; box-shadow: 0 0 20px white; }
+    </style>
+</head>
+<body>
+
+    <div id="scr-init" class="screen active">
+        <div class="menu-card">
+            <h1 style="text-shadow: 0 0 15px var(--neon-red);">TRON: ARES</h1>
+            <button onclick="showScreen('scr-doc-setup')">MODO DOCENTE</button>
+            <button onclick="showScreen('scr-est-join')">MODO ESTUDIANTE</button>
+        </div>
+    </div>
+
+    <div id="scr-doc-setup" class="screen">
+        <div class="menu-card">
+            <h2>NUEVO AULA</h2>
+            <input type="text" id="doc-aula-id" placeholder="ID AULA (Ej: MAT-2026)">
+            <input type="number" id="doc-num" placeholder="Nº DE PAREJAS" min="1" max="25">
+            <select id="doc-op">
+                <option value="suma">OPERACIÓN: SUMA</option>
+                <option value="resta">OPERACIÓN: RESTA</option>
+                <option value="multi">OPERACIÓN: MULTI</option>
+                <option value="div">OPERACIÓN: DIVISIÓN</option>
+            </select>
+            <select id="doc-lv">
+                <option value="1">DIFICULTAD: MONOMIOS</option>
+                <option value="2">DIFICULTAD: BINOMIOS</option>
+                <option value="3">DIFICULTAD: POLINOMIOS</option>
+            </select>
+            <button onclick="crearAula()">INICIALIZAR RED</button>
+            <button style="background:transparent; color:red; border:1px solid red;" onclick="showScreen('scr-init')">ATRÁS</button>
+        </div>
+    </div>
+
+    <div id="scr-doc-monitor" class="screen">
+        <h2 id="mon-title" style="color:var(--neon-red);">AULA: ---</h2>
+        <table class="monitor-table">
+            <thead><tr><th>SECTOR</th><th>USER_01</th><th>USER_02</th><th>ESTADO</th></tr></thead>
+            <tbody id="mon-body"></tbody>
+        </table>
+        <button onclick="location.reload()" style="width:200px; margin-top:20px;">CERRAR SISTEMA</button>
+    </div>
+
+    <div id="scr-est-join" class="screen">
+        <div class="menu-card">
+            <h2>ACCESO</h2>
+            <input type="text" id="est-aula-id" placeholder="CÓDIGO DE AULA">
+            <button onclick="buscarSectores()">BUSCAR SECTORES</button>
+            <div id="lista-sectores" style="margin-top:10px; max-height:250px; overflow-y:auto;"></div>
+            <button style="background:transparent; color:red; border:1px solid red;" onclick="showScreen('scr-init')">ATRÁS</button>
+        </div>
+    </div>
+
+    <div id="scr-game" class="screen">
+        <div id="header-info" style="position:absolute; top:10px; font-size:0.7rem; color:var(--neon-red); opacity:0.6;"></div>
+        <div id="p1-s" class="score-badge" style="left:40px; color:var(--neon-red);">USER_01 > 0</div>
+        <div id="p2-s" class="score-badge" style="right:40px; color:var(--p2-color); border-color:var(--p2-color);">USER_02 > 0</div>
+        
+        <div style="display:flex; align-items:center; gap:20px; margin-bottom:40px; z-index:10;">
+            <div id="box1" class="math-box"></div>
+            <div id="boxOp" style="font-size:3rem; color:var(--neon-red); text-shadow:0 0 10px var(--neon-red);"></div>
+            <div id="box2" class="math-box"></div>
+        </div>
+        <div id="opts-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; width:90%; max-width:420px; z-index:10;"></div>
+        <button id="next-btn" onclick="generarRondaSync()">SIGUIENTE CICLO ⚔️</button>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN FIREBASE (REEMPLAZAR CON TUS DATOS)
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyADvCtH7BLTsTKxv6kGSLrMSd11eENGFMI",
+  authDomain: "tronalgebra.firebaseapp.com",
+  databaseURL: "https://tronalgebra-default-rtdb.firebaseio.com",
+  projectId: "tronalgebra",
+  storageBucket: "tronalgebra.firebasestorage.app",
+  messagingSenderId: "705704589839",
+  appId: "1:705704589839:web:04da89bf9bbdf167fb017a",
+  measurementId: "G-X882DRZM4F"
+};
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let ses = { aula:'', sala:'', pId:'', isMaster:false, op:'', lv:'' };
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function clean(t) {
+            return t.toString().replace(/\^(\d+)/g, '<sup>$1</sup>').replace(/ 1([a-z])/g, ' $1').replace(/^1([a-z])/, '$1').replace(/\+ -/g, '- ').replace(/- -/g, '+ ');
+        }
+
+        // --- DOCENTE ---
+        function crearAula() {
+            const id = document.getElementById('doc-aula-id').value.toUpperCase().trim();
+            const num = document.getElementById('doc-num').value;
+            if(!id || !num) return alert("Faltan datos");
+
+            const data = { op: document.getElementById('doc-op').value, lv: document.getElementById('doc-lv').value, total: num };
+            for(let i=1; i<=num; i++) {
+                data[`SALA_${i}`] = { scores:{p1:0, p2:0}, players:{p1:false, p2:false}, round:null };
+            }
+            db.ref("aulas/"+id).set(data).then(() => { ses.aula = id; abrirMonitor(); });
+        }
+
+        function abrirMonitor() {
+            showScreen('scr-doc-monitor');
+            document.getElementById('mon-title').innerText = "AULA: " + ses.aula;
+            db.ref("aulas/"+ses.aula).on("value", snap => {
+                const val = snap.val();
+                const body = document.getElementById('mon-body');
+                body.innerHTML = '';
+                for(let i=1; i<=val.total; i++) {
+                    const s = val[`SALA_${i}`];
+                    const status = (s.players.p1 && s.players.p2) ? "SINCRO" : "ESPERANDO";
+                    body.innerHTML += `<tr><td>SECTOR ${i}</td><td>${s.scores.p1}</td><td>${s.scores.p2}</td><td>${status}</td></tr>`;
+                }
+            });
+        }
+
+        // --- ESTUDIANTE ---
+        function buscarSectores() {
+            const id = document.getElementById('est-aula-id').value.toUpperCase().trim();
+            db.ref("aulas/"+id).once("value", snap => {
+                if(!snap.exists()) return alert("Aula no encontrada");
+                ses.aula = id; ses.op = snap.val().op; ses.lv = snap.val().lv;
+                const lista = document.getElementById('lista-sectores');
+                lista.innerHTML = '';
+                for(let i=1; i<=snap.val().total; i++) {
+                    if(!(snap.val()[`SALA_${i}`].players.p1 && snap.val()[`SALA_${i}`].players.p2)) {
+                        lista.innerHTML += `<button onclick="unirse(${i})">VINCULAR SECTOR ${i}</button>`;
+                    }
+                }
+            });
+        }
+
+        function unirse(i) {
+            ses.sala = `SALA_${i}`;
+            db.ref(`aulas/${ses.aula}/${ses.sala}/players`).transaction(p => {
+                if(!p.p1) { ses.pId='p1'; ses.isMaster=true; return {p1:true, p2:false}; }
+                if(!p.p2) { ses.pId='p2'; return {p1:true, p2:true}; }
+                return p;
+            }, (err, comm) => {
+                if(comm) {
+                    showScreen('scr-game');
+                    document.getElementById('header-info').innerText = `${ses.aula} | ${ses.sala} | ${ses.pId.toUpperCase()}`;
+                    if(ses.isMaster) generarRondaSync();
+                    escuchar();
+                }
+            });
+        }
+
+        function generarRondaSync() {
+            const getC = () => { let c = Math.floor(Math.random()*16)-8; return c===0?2:c; };
+            let t1='', t2='', ans='', opSym='';
+
+            if(ses.lv === '1') { // MONOMIOS
+                let c1=getC(), c2=getC(), e1=Math.floor(Math.random()*3)+1;
+                if(ses.op === 'div') {
+                    let resC = getC(), dC = Math.floor(Math.random()*4)+2;
+                    t1=`${resC*dC}x^3`; t2=`${dC}x`; ans=`${resC}x^2`; opSym='÷';
+                } else if(ses.op === 'multi') {
+                    t1=`${c1}x^2`; t2=`${c2}x`; ans=`${c1*c2}x^3`; opSym='×';
+                } else {
+                    t1=`${c1}x^2`; t2=`${c2}x^2`; ans=(ses.op==='suma'?c1+c2:c1-c2)+`x^2`; opSym=(ses.op==='suma'?'+':'-');
+                }
+            } else if(ses.lv === '2') { // BINOMIOS
+                let n=getC(); t1=`(x + ${n})`; t2=`(x + 2)`;
+                if(ses.op === 'multi') { ans=`x^2 + ${n+2}x + ${n*2}`; opSym='×'; }
+                else { ans=(ses.op==='suma'?`2x + ${n+2}`:`${n-2}`); opSym=(ses.op==='suma'?'+':'-'); }
+            } else { // POLINOMIOS
+                t1=`(x^2 + 4x)`; t2=`(2x)`;
+                if(ses.op === 'multi') { ans=`2x^3 + 8x^2`; opSym='×'; }
+                else { ans=(ses.op==='suma'?`x^2 + 6x`:`x^2 + 2x`); opSym=(ses.op==='suma'?'+':'-'); }
+            }
+
+            const correct = ans.replace(/\^1/g, '').replace(/\+ 0/g, '');
+            const opts = [correct];
+            while(opts.length < 4) {
+                let d = correct.replace(/(-?\d+)/, m => parseInt(m) + (Math.random()>0.5?2:-2));
+                if(!opts.includes(d)) opts.push(d);
+            }
+
+            db.ref(`aulas/${ses.aula}/${ses.sala}/round`).set({
+                id: Date.now(), t1, t2, op: opSym, ans: correct, opts: opts.sort(() => Math.random()-0.5)
+            });
+        }
+
+        function escuchar() {
+            db.ref(`aulas/${ses.aula}/${ses.sala}`).on("value", snap => {
+                const val = snap.val();
+                document.getElementById('p1-s').innerText = "USER_01 > " + val.scores.p1;
+                document.getElementById('p2-s').innerText = "USER_02 > " + val.scores.p2;
+                if(val.round && val.round.id !== ses.roundId) {
+                    ses.roundId = val.round.id;
+                    render(val.round);
+                }
+            });
+        }
+
+        function render(r) {
+            document.getElementById('box1').innerHTML = clean(r.t1);
+            document.getElementById('box2').innerHTML = clean(r.t2);
+            document.getElementById('boxOp').innerText = r.op;
+            document.getElementById('next-btn').style.display = 'none';
+            const grid = document.getElementById('opts-grid');
+            grid.innerHTML = '';
+            r.opts.forEach(o => {
+                const b = document.createElement('button');
+                b.className = 'opt-card'; b.innerHTML = clean(o);
+                b.onclick = () => {
+                    if(o === r.ans) {
+                        b.classList.add('correct');
+                        db.ref(`aulas/${ses.aula}/${ses.sala}/scores/${ses.pId}`).transaction(s => (s||0)+1);
+                        if(ses.isMaster) document.getElementById('next-btn').style.display = 'block';
+                    } else b.classList.add('wrong');
+                };
+                grid.appendChild(b);
+            });
+        }
+    </script>
+</body>
+</html>
